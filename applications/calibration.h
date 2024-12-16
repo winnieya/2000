@@ -26,6 +26,8 @@
 #define MAGNIFICATION_TIMES     100000
 #define TOFIXED                 100
 
+#define SELF_CALIBRATION
+
 struct _calibration_point{
     uint8_t calibration_flag;
     uint8_t point_counts;
@@ -35,6 +37,30 @@ struct _calibration_point{
     uint32_t signal_value[MAX_POINT_COUNT];
 };
 
+#ifdef SELF_CALIBRATION
+
+#define CURVE_MAX_NUM 10
+#define ADD_CURVE  1
+#define UPDATA_CURVE  2
+
+#define GAS_ZERO  0
+#define GAS_FIVE_HUNDRED  500
+#define GAS_TEN_THOUSAND  10000
+
+typedef struct _calibration_index{
+	uint8_t save_num;
+	uint8_t	curve_index;
+}calibration_index;
+
+typedef struct _signal_table{
+	uint8_t zero_num;
+	uint8_t five_hundred_num;
+	uint8_t ten_thousand_num;
+	uint32_t zero_signal[CURVE_MAX_NUM];
+	uint32_t five_hundred_signal[CURVE_MAX_NUM];
+	uint32_t ten_thousand_signal[CURVE_MAX_NUM];
+}signal_table;
+#endif
 
 void curve_reset(uint8_t curve_type);
 void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value);

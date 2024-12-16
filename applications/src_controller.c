@@ -298,6 +298,7 @@ uint32_t keyboard_input(uint8_t previou_page,uint32_t previou_value)
     return keyborad_value;
 }
 
+uint32_t test_signal = 16000,test_signal2 = 50000, test_signal3 = 100000;
 void om_src_ctr(void *parameter)
 {
     uint32_t fid_value  = 0;
@@ -325,12 +326,12 @@ void om_src_ctr(void *parameter)
     bg_value_show(bg_value);
     /*<<< 开机动画 */
     g_current_page_num = 0;
-    om_paging(g_current_page_num);
+    om_paging(g_current_page_num);//加载中
     rt_thread_mdelay(1000);
     for(int i =0;i<18;i++)
     {
         g_current_page_num = i%6 + 1;
-        om_paging(g_current_page_num);
+        om_paging(g_current_page_num);//......
         rt_thread_mdelay(300);
     }
     /* 开机动画 >>>*/
@@ -464,8 +465,12 @@ void om_src_ctr(void *parameter)
             }
             else if(g_current_page_num == 27)   //校准曲线清除
             {
+#ifndef SELF_CALIBRATION
                 curve_reset(FID_CURVE);
-                g_current_page_num = page_index_list[g_current_page_num].confirm_page_num;
+#else
+				auto_curve_updata(FID_CURVE);
+#endif
+				g_current_page_num = page_index_list[g_current_page_num].confirm_page_num;
                 om_paging(g_current_page_num);
             }
             else if(g_current_page_num == 29 ||
@@ -475,13 +480,17 @@ void om_src_ctr(void *parameter)
                 rt_thread_mdelay(100);
                 if(g_current_page_num == 29)
                 {
-                    curve_updata(FID_CURVE,0,om_get_ddc112_value()*20/19);
+                	curve_reset(FID_CURVE);
+					test_signal+=500;
+                    curve_updata(FID_CURVE,0,test_signal);//om_get_ddc112_value()*20/19);
                 }
                 else if(g_current_page_num == 32){
-                    curve_updata(FID_CURVE,500,om_get_ddc112_value());
+					test_signal2+=700;
+                    curve_updata(FID_CURVE,500,test_signal2);//om_get_ddc112_value());
                 }
                 else if(g_current_page_num == 35){
-                    curve_updata(FID_CURVE,10000,om_get_ddc112_value());
+					test_signal3+=1000;
+                    curve_updata(FID_CURVE,10000,test_signal3);//om_get_ddc112_value());
                 }
                 om_paging(g_current_page_num + 1);
                 rt_thread_mdelay(4000);

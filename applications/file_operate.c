@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2006-2021, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -93,6 +93,51 @@ int file_write(const char *file_name,uint8_t *buffer,uint16_t write_len)
 
     return 1;
 }
+
+int file_lseek_read(const char *filename,uint8_t* buffer,uint16_t write_len,off_t offset){
+	int fd;
+	int length;
+
+	fd = open(filename, O_RDONLY,0);
+	if(fd < 0){
+		rt_kprintf("open file for lseek read failed\n");
+		return -1;
+	}
+
+	lseek(fd, offset, SEEK_SET);
+	length = read(fd, buffer, write_len);
+	if(length != write_len){
+		rt_kprintf("lseek read data failed\n");
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+	return 1;
+}
+
+int file_lseek_write(const char *filename,uint8_t* buffer,uint16_t write_len,off_t offset){
+	int fd;
+	int length;
+
+	fd = open(filename, O_WRONLY,0);
+	if(fd < 0){
+		rt_kprintf("open file for lseek write failed\n");
+		return -1;
+	}
+
+	lseek(fd, offset, SEEK_SET);
+	length = write(fd, buffer, write_len);
+	if(length != write_len){
+		rt_kprintf("lseek read data failed\n");
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+	return 1;
+}
+
 
 int file_is_exist(const char *file_name)
 {
