@@ -298,7 +298,6 @@ uint32_t keyboard_input(uint8_t previou_page,uint32_t previou_value)
     return keyborad_value;
 }
 
-uint32_t test_signal = 16000,test_signal2 = 50000, test_signal3 = 100000;
 void om_src_ctr(void *parameter)
 {
     uint32_t fid_value  = 0;
@@ -481,15 +480,12 @@ void om_src_ctr(void *parameter)
                 if(g_current_page_num == 29)
                 {
                 	curve_reset(FID_CURVE);
-					//test_signal+=500;
                     curve_updata(FID_CURVE,0,om_get_ddc112_value()*20/19);
                 }
                 else if(g_current_page_num == 32){
-					//test_signal2+=700;
                     curve_updata(FID_CURVE,500,om_get_ddc112_value());
                 }
                 else if(g_current_page_num == 35){
-					//test_signal3+=1000;
                     curve_updata(FID_CURVE,10000,om_get_ddc112_value());
                 }
                 om_paging(g_current_page_num + 1);
