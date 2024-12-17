@@ -286,7 +286,7 @@ void reconstruction_curr_curve(struct _calibration_point *calibration_point, cal
 	uint8_t i;
 	//当前曲线无效
 	if(!calibration_point->calibration_flag ){
-		file_lseek_write(FID_CURVE_FILE, 
+		file_lseek_read(FID_CURVE_FILE, 
 						 (uint8_t*)calibration_point, 
 						 sizeof(struct _calibration_point), 
 						 (sizeof(struct _calibration_point)*(calibration_desc->curve_index-2))+sizeof(calibration_index));
@@ -295,37 +295,49 @@ void reconstruction_curr_curve(struct _calibration_point *calibration_point, cal
 		}else{
 			calibration_desc->curve_index--;
 		}
-		
+		calibration_desc->save_num--;
 	}
-	memset((void *)calibration_point->k_value,0,sizeof(int64_t)*MAX_CURVE_COUNT);
-	memset((void *)calibration_point->b_value,0,sizeof(int64_t)*MAX_CURVE_COUNT);
+	if(calibration_point->point_counts == MIN_CURVE_CALCULATION_POINT){
+		calibration_point->gas_value[2] = calibration_point->gas_value[1];
+		calibration_point->signal_value[2] = calibration_point->signal_value[1];
+		calibration_point->k_value[1] = calibration_point->k_value[0];
+		calibration_point->b_value[1] = calibration_point->b_value[0];
+	}
+	//memset((void *)calibration_point->k_value,0,sizeof(int64_t)*MAX_CURVE_COUNT);
+	//memset((void *)calibration_point->b_value,0,sizeof(int64_t)*MAX_CURVE_COUNT);
 	if(calibration_point->gas_value[2] == GAS_FIVE_HUNDRED){
 		calibration_point->gas_value[1] = calibration_point->gas_value[2];
 		calibration_point->signal_value[1] = calibration_point->signal_value[2];
+		calibration_point->k_value[0] = calibration_point->k_value[1];
+		calibration_point->b_value[0] = calibration_point->b_value[1];
 	}
 	for(i = 3; i < calibration_point->point_counts; i++){
 		if(calibration_point->gas_value[i] == GAS_FIVE_HUNDRED){
 			calibration_point->gas_value[1] = calibration_point->gas_value[i];
 			calibration_point->signal_value[1] = calibration_point->signal_value[i];
-			calibration_point->gas_value[i] = 0;
-			calibration_point->signal_value[i] = 0;
+			calibration_point->k_value[0] = calibration_point->k_value[i-1];
+			calibration_point->b_value[0] = calibration_point->b_value[i-1];
+			
 		}else if(calibration_point->gas_value[i] == GAS_TEN_THOUSAND){
 			calibration_point->gas_value[2] = calibration_point->gas_value[i];
 			calibration_point->signal_value[2] = calibration_point->signal_value[i];
-			calibration_point->gas_value[i] = 0;
-			calibration_point->signal_value[i] = 0;
-		}else{
-			calibration_point->gas_value[i] = 0;
-			calibration_point->signal_value[i] = 0;
+			calibration_point->k_value[2] = calibration_point->k_value[i-1];
+			calibration_point->b_value[2] = calibration_point->b_value[i-1];
 		}
+		calibration_point->gas_value[i] = 0;
+		calibration_point->signal_value[i] = 0;
+		calibration_point->k_value[i-1] = 0;
+		calibration_point->b_value[i-1] = 0;
 	}
 	if(calibration_point->gas_value[1] != GAS_FIVE_HUNDRED){
-		calibration_point->signal_value[1] = ((calibration_point->signal_value[1] - calibration_point->signal_value[0])/calibration_point->gas_value[1])*500;
+		//calibration_point->signal_value[1] = ((((calibration_point->signal_value[1] - calibration_point->signal_value[0])*100)/calibration_point->gas_value[1])*GAS_FIVE_HUNDRED)/100;
+		calibration_point->signal_value[1] = (uint32_t)((int64_t)(GAS_FIVE_HUNDRED*TOFIXED-(calibration_point->b_value[0]*TOFIXED))/TOFIXED*MAGNIFICATION_TIMES/calibration_point->k_value[0]);
 		calibration_point->gas_value[1] = GAS_FIVE_HUNDRED;
 	}
 
 	if(calibration_point->gas_value[2] != GAS_TEN_THOUSAND){
-		calibration_point->signal_value[2] = ((calibration_point->signal_value[2] - calibration_point->signal_value[0])/calibration_point->gas_value[2])*1000;
+		//calibration_point->signal_value[2] = ((((calibration_point->signal_value[2] - calibration_point->signal_value[0])*100)/calibration_point->gas_value[2])*GAS_TEN_THOUSAND)/100;
+		calibration_point->signal_value[2] = (uint32_t)((int64_t)(GAS_TEN_THOUSAND*TOFIXED-(calibration_point->b_value[1]*TOFIXED))/TOFIXED*MAGNIFICATION_TIMES/calibration_point->k_value[1]);
 		calibration_point->gas_value[2] = GAS_TEN_THOUSAND;
 	}
 	calibration_point->point_counts = 3;
@@ -404,11 +416,11 @@ void auto_curve_updata(uint8_t curve_type)
     close(fd);
 	for(int i = 1; i < 10; i++){
 		if(tmp_signal.zero_signal[i])
-			ave_zero += (tmp_signal.zero_signal[i] - tmp_signal.zero_signal[i-1])/(tmp_signal.zero_num-1);
+			ave_zero += (int32_t)(tmp_signal.zero_signal[i] - tmp_signal.zero_signal[i-1])/(tmp_signal.zero_num-1);
 		if(tmp_signal.five_hundred_signal[i])
-			ave_five_hundred += (tmp_signal.five_hundred_signal[i] - tmp_signal.five_hundred_signal[i-1])/(tmp_signal.five_hundred_num-1);
+			ave_five_hundred += (int32_t)(tmp_signal.five_hundred_signal[i] - tmp_signal.five_hundred_signal[i-1])/(tmp_signal.five_hundred_num-1);
 		if(tmp_signal.ten_thousand_signal[i])
-			ave_ten_thousand += (tmp_signal.ten_thousand_signal[i] - tmp_signal.ten_thousand_signal[i-1])/(tmp_signal.ten_thousand_num-1);
+			ave_ten_thousand += (int32_t)(tmp_signal.ten_thousand_signal[i] - tmp_signal.ten_thousand_signal[i-1])/(tmp_signal.ten_thousand_num-1);
 	}
 	reconstruction_curr_curve(temp_calibration_point, temp_calibration_desc);
 	temp_calibration_point->calibration_flag = 0;
@@ -571,8 +583,8 @@ int om_file_init(void)
 {
     /*文件系统初始化，SPI flash挂载*/
     file_system_init();
-	remove(FID_CURVE_FILE);
-	remove(PID_CURVE_FILE);
+	//remove(FID_CURVE_FILE);
+	//remove(PID_CURVE_FILE);
     /*曲线文件打开，如果文件不存在，创建文件*/
     file_create(FID_CURVE_FILE);
     file_create(PID_CURVE_FILE);

@@ -481,16 +481,16 @@ void om_src_ctr(void *parameter)
                 if(g_current_page_num == 29)
                 {
                 	curve_reset(FID_CURVE);
-					test_signal+=500;
-                    curve_updata(FID_CURVE,0,test_signal);//om_get_ddc112_value()*20/19);
+					//test_signal+=500;
+                    curve_updata(FID_CURVE,0,om_get_ddc112_value()*20/19);
                 }
                 else if(g_current_page_num == 32){
-					test_signal2+=700;
-                    curve_updata(FID_CURVE,500,test_signal2);//om_get_ddc112_value());
+					//test_signal2+=700;
+                    curve_updata(FID_CURVE,500,om_get_ddc112_value());
                 }
                 else if(g_current_page_num == 35){
-					test_signal3+=1000;
-                    curve_updata(FID_CURVE,10000,test_signal3);//om_get_ddc112_value());
+					//test_signal3+=1000;
+                    curve_updata(FID_CURVE,10000,om_get_ddc112_value());
                 }
                 om_paging(g_current_page_num + 1);
                 rt_thread_mdelay(4000);
