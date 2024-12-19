@@ -40,8 +40,8 @@ struct _calibration_point{
 #ifdef SELF_CALIBRATION
 
 #define CURVE_MAX_NUM 10
-#define ADD_CURVE  1
-#define UPDATA_CURVE  2
+#define AUTO_CALIBRATION  1
+#define MANUAL_CALIBRATION  2
 
 #define GAS_ZERO  0
 #define GAS_FIVE_HUNDRED  500
@@ -60,6 +60,9 @@ typedef struct _signal_table{
 	uint32_t five_hundred_signal[CURVE_MAX_NUM];
 	uint32_t ten_thousand_signal[CURVE_MAX_NUM];
 }signal_table;
+
+void auto_curve_updata(uint8_t curve_type);
+
 #endif
 
 void curve_reset(uint8_t curve_type);

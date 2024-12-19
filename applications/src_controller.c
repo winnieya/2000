@@ -224,6 +224,7 @@ void byte_order_conversion_uint32(rt_uint8_t* conv_buf,rt_uint32_t conv_value)
     conv_buf[1] = (conv_value >> 16);
     conv_buf[0] = (conv_value >> 24);
 }
+extern uint8_t g_history_curve_update_flag;
 
 uint32_t keyboard_input(uint8_t previou_page,uint32_t previou_value)
 {
@@ -375,6 +376,7 @@ void om_src_ctr(void *parameter)
         }
         else if(g_skip_mode == SKIP_MODE_CANCEL)
         {
+        	g_history_curve_update_flag = 0;
             g_current_page_num = page_index_list[g_current_page_num].cancel_page_num;
             om_paging(g_current_page_num);
         }
@@ -462,6 +464,13 @@ void om_src_ctr(void *parameter)
                 }
                 om_paging(g_current_page_num);
             }
+#ifdef SELF_CALIBRATION
+			else if(g_current_page_num == 26)  //手动校准
+            {
+				curve_reset(FID_CURVE);
+				g_current_page_num = page_index_list[g_current_page_num].confirm_page_num;
+            }
+#endif
             else if(g_current_page_num == 27)   //校准曲线清除
             {
 #ifndef SELF_CALIBRATION
@@ -479,7 +488,6 @@ void om_src_ctr(void *parameter)
                 rt_thread_mdelay(100);
                 if(g_current_page_num == 29)
                 {
-                	curve_reset(FID_CURVE);
                     curve_updata(FID_CURVE,0,om_get_ddc112_value()*20/19);
                 }
                 else if(g_current_page_num == 32){

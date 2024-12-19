@@ -24,6 +24,8 @@
 
 #define FID_CURVE_FILE    "/fid_curve_file.txt"
 #define PID_CURVE_FILE    "/pid_curve_file.txt"
+#define HISTORY_FID_CURVE_FILE    "/history_fid_curve_file.txt"
+#define HISTORY_PID_CURVE_FILE    "/history_pid_curve_file.txt"
 #define HISTORY_DATA_FILE    "/history_data_file.txt"
 #define DECICE_SET_DATA_FILE    "/device_set_data_file.txt"
 
@@ -31,8 +33,9 @@ struct _calibration_point fid_calibration_point = {0};
 struct _calibration_point pid_calibration_point = {0};
 
 #ifdef SELF_CALIBRATION
-calibration_index fid_calibration_desc = {0};
-calibration_index pid_calibration_desc = {0};
+calibration_index history_fid_curve_desc = {0};
+calibration_index history_pid_curve_desc = {0};
+uint8_t g_history_curve_update_flag = 0;
 #endif
 static uint32_t zore_signal_value = 0;
 
@@ -119,7 +122,7 @@ static void curve_save(uint8_t curve_type)
     LOG_I("curve save write\r\n");
 }
 #else
-static void curve_save(uint8_t curve_type, uint8_t save_type)
+static void curve_save(uint8_t curve_type,uint8_t calibration_type)
 {
 	off_t tmp_offset = 0;
 	char filename[32];
@@ -128,43 +131,40 @@ static void curve_save(uint8_t curve_type, uint8_t save_type)
 	calibration_index *calibration_desc_p = NULL;
     if(curve_type == FID_CURVE)
     {
-    	strcpy(filename,FID_CURVE_FILE);
+    	strcpy(filename,HISTORY_FID_CURVE_FILE);
     	tmp_calibration_p = &fid_calibration_point;
-		calibration_desc_p = &fid_calibration_desc;
+		calibration_desc_p = &history_fid_curve_desc;
+		file_write(FID_CURVE_FILE,(uint8_t*)&fid_calibration_point,sizeof(fid_calibration_point));
     }
     else
     {
-    	strcpy(filename,PID_CURVE_FILE);
+    	strcpy(filename,HISTORY_PID_CURVE_FILE);
     	tmp_calibration_p = &pid_calibration_point;
-		calibration_desc_p = &pid_calibration_desc;
+		calibration_desc_p = &history_pid_curve_desc;
+		file_write(PID_CURVE_FILE,(uint8_t*)&pid_calibration_point,sizeof(pid_calibration_point));
     }
 
-	tmp_offset = (sizeof(curr_read_calibration)*(calibration_desc_p->curve_index-1))+sizeof(calibration_index);
-	//防止文件保存无效的曲线
-	if(calibration_desc_p->save_num != 0  ){
-		file_lseek_read(filename, (uint8_t*)&curr_read_calibration, sizeof(struct _calibration_point), tmp_offset);
-		if(curr_read_calibration.calibration_flag == 0){
-			save_type = UPDATA_CURVE;
+	if(calibration_type == MANUAL_CALIBRATION){
+		//update curve
+		if(g_history_curve_update_flag){
+			tmp_offset = (sizeof(curr_read_calibration)*(calibration_desc_p->curve_index-1))+sizeof(calibration_index);
+	   		file_lseek_write(filename, (uint8_t*)tmp_calibration_p, sizeof(struct _calibration_point), tmp_offset);
 		}
-	}
-	//update curve
-	if(save_type == UPDATA_CURVE){
-   		file_lseek_write(filename, (uint8_t*)tmp_calibration_p, sizeof(struct _calibration_point), tmp_offset);
-	}
-	else{
-		
-		//save new curve
-		tmp_offset = sizeof(struct _calibration_point)*calibration_desc_p->curve_index+sizeof(calibration_index);
-        file_lseek_write(filename, (uint8_t*)tmp_calibration_p, sizeof(struct _calibration_point), tmp_offset);
-		if(calibration_desc_p->curve_index < CURVE_MAX_NUM)
-    	{
-			calibration_desc_p->curve_index++;
-		}else{
-			calibration_desc_p->curve_index = 1;
+		else{
+			g_history_curve_update_flag = 1;
+			//save new curve
+			tmp_offset = sizeof(struct _calibration_point)*calibration_desc_p->curve_index+sizeof(calibration_index);
+	        file_lseek_write(filename, (uint8_t*)tmp_calibration_p, sizeof(struct _calibration_point), tmp_offset);
+			if(calibration_desc_p->curve_index < CURVE_MAX_NUM)
+	    	{
+				calibration_desc_p->curve_index++;
+			}else{
+				calibration_desc_p->curve_index = 1;
+			}
+			if(calibration_desc_p->save_num < CURVE_MAX_NUM)
+				calibration_desc_p->save_num++;
+			file_lseek_write(filename,(uint8_t*)calibration_desc_p,sizeof(calibration_index),0);
 		}
-		if(calibration_desc_p->save_num < CURVE_MAX_NUM)
-			calibration_desc_p->save_num++;
-		file_lseek_write(filename,(uint8_t*)calibration_desc_p,sizeof(calibration_index),0);
 	}
 
     LOG_I("curve save write\r\n");
@@ -193,10 +193,17 @@ uint32_t get_curve_value(uint8_t index)
     temp_calibration_point = &fid_calibration_point;
     return temp_calibration_point->gas_value[index];
 }
+void winni_test(){
+
+
+}
 /*曲线更新*/
 void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value)
 {
     struct _calibration_point *temp_calibration_point = NULL;
+	uint32_t max_gas = 0, min_gas = 0, tmp_gas = 0;
+	max_gas = (_gas_value*100+_gas_value*8);
+	min_gas = (_gas_value*100-_gas_value*8);
     if(curve_type == FID_CURVE)
     {
         temp_calibration_point = &fid_calibration_point;
@@ -216,6 +223,8 @@ void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value)
 //                LOG_I("repeat calibration_point 0 \r\n");
 //                return;
 //            }
+            if(temp_calibration_point->signal_value[i] == 0 && i > temp_calibration_point->point_counts-1)
+                break;
             if((i == 0) &&(temp_calibration_point->point_counts == 0))
             {
                             //temp_calibration_point->gas_value[i] = _gas_value;
@@ -225,6 +234,7 @@ void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value)
             }
             else
             {
+            	tmp_gas = 
                 /*当新校准值已经存在时，曲线更新*/
                 temp_calibration_point->gas_value[i] = _gas_value;
                 temp_calibration_point->signal_value[i] = _signal_value;
@@ -243,7 +253,7 @@ void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value)
 #ifndef SELF_CALIBRATION
                 curve_save(curve_type);
 #else
-				curve_save(curve_type,UPDATA_CURVE);
+				curve_save(curve_type,MANUAL_CALIBRATION);
 #endif   
                 return;
             }
@@ -259,9 +269,6 @@ void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value)
     if(temp_calibration_point->point_counts < MIN_CURVE_CALCULATION_POINT)
     {
         LOG_I("temp_calibration_point.point_counts < MIN_CURVE_CALCULATION_POINT\r\n");
-#ifdef SELF_CALIBRATION
-		curve_save(curve_type,ADD_CURVE);
-#endif
         return;
     }
     LOG_I("temp_calibration_point.point_counts %d\r\n",temp_calibration_point->point_counts);
@@ -275,7 +282,7 @@ void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value)
 #ifndef SELF_CALIBRATION
 	curve_save(curve_type);
 #else
-	curve_save(curve_type,UPDATA_CURVE);
+	curve_save(curve_type,MANUAL_CALIBRATION);
 #endif
 }
 
@@ -289,22 +296,16 @@ void reconstruction_curr_curve(struct _calibration_point *calibration_point, cal
 		file_lseek_read(FID_CURVE_FILE, 
 						 (uint8_t*)calibration_point, 
 						 sizeof(struct _calibration_point), 
-						 (sizeof(struct _calibration_point)*(calibration_desc->curve_index-2))+sizeof(calibration_index));
-		if(calibration_desc->curve_index <= 1){
-			calibration_desc->curve_index = 10;
-		}else{
-			calibration_desc->curve_index--;
-		}
-		calibration_desc->save_num--;
+						 (sizeof(struct _calibration_point)*(calibration_desc->curve_index-1))+sizeof(calibration_index));
 	}
+	
 	if(calibration_point->point_counts == MIN_CURVE_CALCULATION_POINT){
 		calibration_point->gas_value[2] = calibration_point->gas_value[1];
 		calibration_point->signal_value[2] = calibration_point->signal_value[1];
 		calibration_point->k_value[1] = calibration_point->k_value[0];
 		calibration_point->b_value[1] = calibration_point->b_value[0];
 	}
-	//memset((void *)calibration_point->k_value,0,sizeof(int64_t)*MAX_CURVE_COUNT);
-	//memset((void *)calibration_point->b_value,0,sizeof(int64_t)*MAX_CURVE_COUNT);
+
 	if(calibration_point->gas_value[2] == GAS_FIVE_HUNDRED){
 		calibration_point->gas_value[1] = calibration_point->gas_value[2];
 		calibration_point->signal_value[1] = calibration_point->signal_value[2];
@@ -358,14 +359,14 @@ void auto_curve_updata(uint8_t curve_type)
     if(curve_type == FID_CURVE)
     {
         temp_calibration_point = &fid_calibration_point;
-		temp_calibration_desc = &fid_calibration_desc;
-		fd = open(FID_CURVE_FILE, O_RDONLY, 0);
+		temp_calibration_desc = &history_fid_curve_desc;
+		fd = open(HISTORY_FID_CURVE_FILE, O_RDONLY, 0);
     }
     else
     {
         temp_calibration_point = &pid_calibration_point;
-		temp_calibration_desc = &pid_calibration_desc;
-		fd = open(PID_CURVE_FILE, O_RDONLY, 0);
+		temp_calibration_desc = &history_pid_curve_desc;
+		fd = open(HISTORY_PID_CURVE_FILE, O_RDONLY, 0);
     }
 	
     if (fd < 0)
@@ -374,7 +375,7 @@ void auto_curve_updata(uint8_t curve_type)
         return;
     }
 
-    /* 写入数据 */
+    /* 读取数据 */
     length = read(fd, (uint8_t *)&read_calibration_desc, sizeof(read_calibration_desc));
 	if(length != sizeof(read_calibration_desc)){
 		rt_kprintf("read calibration desc failed\n");
@@ -430,7 +431,7 @@ void auto_curve_updata(uint8_t curve_type)
 	
     curve_calculate(temp_calibration_point);
 	temp_calibration_point->calibration_flag = 1;
-    curve_save(curve_type,ADD_CURVE);
+    curve_save(curve_type,AUTO_CALIBRATION);
     
 }
 
@@ -583,25 +584,20 @@ int om_file_init(void)
 {
     /*文件系统初始化，SPI flash挂载*/
     file_system_init();
-	//remove(FID_CURVE_FILE);
-	//remove(PID_CURVE_FILE);
+	
     /*曲线文件打开，如果文件不存在，创建文件*/
     file_create(FID_CURVE_FILE);
     file_create(PID_CURVE_FILE);
+	file_create(HISTORY_FID_CURVE_FILE);
+    file_create(HISTORY_PID_CURVE_FILE);
     file_create(HISTORY_DATA_FILE);
     file_create(DECICE_SET_DATA_FILE);
 
-    file_read(FID_CURVE_FILE,(uint8_t*)&fid_calibration_desc,sizeof(fid_calibration_desc));
-	file_lseek_read(FID_CURVE_FILE,
-				    (uint8_t*)&fid_calibration_point,
-				    sizeof(fid_calibration_point),
-				    (sizeof(fid_calibration_point)*(fid_calibration_desc.curve_index-1))+sizeof(fid_calibration_desc));
+    file_read(HISTORY_FID_CURVE_FILE,(uint8_t*)&history_fid_curve_desc,sizeof(history_fid_curve_desc));
+	file_read(FID_CURVE_FILE,(uint8_t*)&fid_calibration_point,sizeof(fid_calibration_point));
     LOG_I("fid curve init read\r\n");
-    file_read(PID_CURVE_FILE,(uint8_t*)&pid_calibration_desc,sizeof(pid_calibration_desc));
-	file_lseek_read(PID_CURVE_FILE,
-				    (uint8_t*)&pid_calibration_point,
-				    sizeof(pid_calibration_point),
-				    (sizeof(pid_calibration_point)*(pid_calibration_desc.curve_index-1))+sizeof(pid_calibration_desc));
+    file_read(HISTORY_PID_CURVE_FILE,(uint8_t*)&history_pid_curve_desc,sizeof(history_pid_curve_desc));
+	file_read(PID_CURVE_FILE,(uint8_t*)&pid_calibration_point,sizeof(pid_calibration_point));
     LOG_I("pid curve init read\r\n");
     return 0;
 }
@@ -609,19 +605,22 @@ int om_file_init(void)
 #if 1
 void sread(void){
 	int fd;
-	uint16_t power_on = 0;
 	struct _calibration_point usage = {0};
 	calibration_index fid_calibration_desc = {0};
 	
-	fd = open(FID_CURVE_FILE, O_RDONLY,0);
+	fd = open(HISTORY_FID_CURVE_FILE, O_RDONLY,0);
 	if(fd < 0){
 		rt_kprintf("open file for lseek read failed\n");
-		return -1;
+		return;
 	}
 	read(fd, (char*)&fid_calibration_desc, sizeof(fid_calibration_desc));
 	rt_kprintf("save number = %d current index = %d\n",fid_calibration_desc.save_num,fid_calibration_desc.curve_index);
     while(read(fd, (char*)&usage, sizeof(usage)) != NULL){
-		rt_kprintf("gas_value %d  signal_value %d\n",usage.gas_value,usage.signal_value);
+		int i = 0;
+		while(usage.signal_value[i]){
+			rt_kprintf("gas_value %d  signal_value %d\n",usage.gas_value[i],usage.signal_value[i]);
+			i++;
+		}
     }
 
 	close(fd);
@@ -630,6 +629,16 @@ void sread(void){
 
 
 MSH_CMD_EXPORT(sread,sread file);
+
+void rm_fid_curve(void){
+	remove(FID_CURVE_FILE);
+	remove(HISTORY_FID_CURVE_FILE);
+	return;
+}
+
+
+MSH_CMD_EXPORT(rm_fid_curve,rm_fid_curve file);
+
 #endif
 
 #endif
