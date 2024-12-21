@@ -486,18 +486,24 @@ void om_src_ctr(void *parameter)
                     g_current_page_num == 35)
             {
                 rt_thread_mdelay(100);
+				int warring = 0;
                 if(g_current_page_num == 29)
                 {
-                    curve_updata(FID_CURVE,0,om_get_ddc112_value()*20/19);
+                    warring = curve_updata(FID_CURVE,0,om_get_ddc112_value()*20/19);
                 }
                 else if(g_current_page_num == 32){
-                    curve_updata(FID_CURVE,500,om_get_ddc112_value());
+                    warring = curve_updata(FID_CURVE,500,om_get_ddc112_value());
                 }
                 else if(g_current_page_num == 35){
-                    curve_updata(FID_CURVE,10000,om_get_ddc112_value());
+                    warring = curve_updata(FID_CURVE,10000,om_get_ddc112_value());
                 }
-                om_paging(g_current_page_num + 1);
-                rt_thread_mdelay(4000);
+				if(warring != 0){
+					om_paging(warring);
+	                rt_thread_mdelay(2000);
+				}else{
+	                om_paging(g_current_page_num + 1);
+	                rt_thread_mdelay(4000);
+				}
                 om_paging(g_current_page_num);
                 rt_thread_mdelay(100);
             }

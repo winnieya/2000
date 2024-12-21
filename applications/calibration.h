@@ -44,6 +44,7 @@ struct _calibration_point{
 #define MANUAL_CALIBRATION  2
 
 #define GAS_ZERO  0
+#define GAS_ONE_HUNDRED 100
 #define GAS_FIVE_HUNDRED  500
 #define GAS_TEN_THOUSAND  10000
 
@@ -62,11 +63,11 @@ typedef struct _signal_table{
 }signal_table;
 
 void auto_curve_updata(uint8_t curve_type);
-
+void rm_fid_curve(void);
 #endif
 
 void curve_reset(uint8_t curve_type);
-void curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value);
+int curve_updata(uint8_t curve_type,uint32_t _gas_value,uint32_t _signal_value);
 uint32_t get_detect_value(uint8_t curve_type,uint32_t read_signal);
 uint8_t get_detect_flag(uint8_t curve_type);
 void ppm_calbarate(void);
